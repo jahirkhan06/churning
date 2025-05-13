@@ -1,16 +1,16 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns # type: ignore
-import matplotlib.pyplot as plt # type: ignore
-from sklearn.ensemble import RandomForestClassifier # type: ignore
-from sklearn.model_selection import train_test_split # type: ignore
-from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, roc_curve # type: ignore
-import xgboost as xgb # type: ignore
-import shap # type: ignore
+import seaborn as sns  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
+from sklearn.ensemble import RandomForestClassifier  # type: ignore
+from sklearn.model_selection import train_test_split  # type: ignore
+from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, roc_curve  # type: ignore
+import xgboost as xgb  # type: ignore
+import shap  # type: ignore
 
 # Streamlit Config
-# st.set_option('deprecation.showPyplotGlobalUse', False) # This line is causing the error. Remove it.
+# st.set_option('deprecation.showPyplotGlobalUse', False)  # This line is causing the error. Remove it.
 st.title("Telco Customer Churn - Full ML Pipeline")
 
 # 1. Upload Dataset
@@ -110,51 +110,52 @@ if uploaded_file is not None:
     # 7. SHAP Analysis
     st.header("6. Model Explainability (SHAP)")
     shap.initjs()
-    explainer = shap.Explainer(xgb_model)
-    shap_values = explainer(X_test)
+    explainer = shap.TreeExplainer(xgb_model)  # Optimized explainer for tree models
+    shap_values = explainer.shap_values(X_test)
 
     st.subheader("Top Features by SHAP Value")
-    fig_shap = shap.plots.bar(shap_values, show=False)
+    shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
     st.pyplot(bbox_inches='tight')
-   # 8. Manual Input Prediction
+
+    # 8. Manual Input Prediction
     st.header("7. Manual Churn Prediction")
 
     with st.form("prediction_form"):
-         st.subheader("Enter Customer Info:")
+        st.subheader("Enter Customer Info:")
 
-         gender = st.selectbox("Gender", ["Male", "Female"])
-         senior = st.selectbox("Senior Citizen", [0, 1])
-         partner = st.selectbox("Has Partner?", ["Yes", "No"])
-         dependents = st.selectbox("Has Dependents?", ["Yes", "No"])
-         tenure = st.slider("Tenure (months)", 0, 72, 12)
-         monthly = st.slider("Monthly Charges", 0.0, 150.0, 70.0)
-         total = st.slider("Total Charges", 0.0, 10000.0, 2000.0)
-         tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])[0]
+        gender = st.selectbox("Gender", ["Male", "Female"])
+        senior = st.selectbox("Senior Citizen", [0, 1])
+        partner = st.selectbox("Has Partner?", ["Yes", "No"])
+        dependents = st.selectbox("Has Dependents?", ["Yes", "No"])
+        tenure = st.slider("Tenure (months)", 0, 72, 12)
+        monthly = st.slider("Monthly Charges", 0.0, 150.0, 70.0)
+        total = st.slider("Total Charges", 0.0, 10000.0, 2000.0)
+        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])[0]
 
-         submitted = st.form_submit_button("Predict")
+        submitted = st.form_submit_button("Predict")
 
-         if submitted:
-             input_data = {
-            'SeniorCitizen': senior,
-            'tenure': tenure,
-            'MonthlyCharges': monthly,
-            'TotalCharges': total,
-            'gender_Male': 1 if gender == 'Male' else 0,
-            'Partner_Yes': 1 if partner == 'Yes' else 0,
-            'Dependents_Yes': 1 if dependents == 'Yes' else 0,
-            'TenureGroup_12-24': 1 if tenure_group == '12-24' else 0,
-            'TenureGroup_24-48': 1 if tenure_group == '24-48' else 0,
-            'TenureGroup_48-72': 1 if tenure_group == '48-72' else 0
-        }
+        if submitted:
+            input_data = {
+                'SeniorCitizen': senior,
+                'tenure': tenure,
+                'MonthlyCharges': monthly,
+                'TotalCharges': total,
+                'gender_Male': 1 if gender == 'Male' else 0,
+                'Partner_Yes': 1 if partner == 'Yes' else 0,
+                'Dependents_Yes': 1 if dependents == 'Yes' else 0,
+                'TenureGroup_12-24': 1 if tenure_group == '12-24' else 0,
+                'TenureGroup_24-48': 1 if tenure_group == '24-48' else 0,
+                'TenureGroup_48-72': 1 if tenure_group == '48-72' else 0
+            }
 
-        # Add missing columns (your model might expect more, add as needed)
-        for col in X.columns:
-            if col not in input_data:
-                input_data[col] = 0
+            # Add missing columns (your model might expect more, add as needed)
+            for col in X.columns:
+                if col not in input_data:
+                    input_data[col] = 0
 
-        input_df = pd.DataFrame([input_data])
-        prediction = xgb_model.predict(input_df)[0]
-        prob = xgb_model.predict_proba(input_df)[0][1]
+            input_df = pd.DataFrame([input_data])
+            prediction = xgb_model.predict(input_df)[0]
+            prob = xgb_model.predict_proba(input_df)[0][1]
 
-        st.success(f"Prediction: {'Will Churn' if prediction == 1 else 'Will Not Churn'}")
-        st.info(f"Probability of Churn: {prob:.2f}")
+            st.success(f"Prediction: {'Will Churn' if prediction == 1 else 'Will Not Churn'}")
+            st.info(f"Probability of Churn: {prob:.2f}")
