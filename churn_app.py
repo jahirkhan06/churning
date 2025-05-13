@@ -1,21 +1,21 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns  # type: ignore
-import matplotlib.pyplot as plt  # type: ignore
-from sklearn.ensemble import RandomForestClassifier  # type: ignore
-from sklearn.model_selection import train_test_split  # type: ignore
-from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, roc_curve  # type: ignore
-import xgboost as xgb  # type: ignore
-import shap  # type: ignore
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, roc_curve
+import xgboost as xgb
+import shap
 
 # Streamlit Config
-# st.set_option('deprecation.showPyplotGlobalUse', False)  # This line is causing the error. Remove it.
 st.title("Telco Customer Churn - Full ML Pipeline")
 
 # 1. Upload Dataset
 st.header("1. Upload Dataset")
 uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
     st.write("Raw Data", df.head())
@@ -38,7 +38,7 @@ if uploaded_file is not None:
 
     # 4. Exploratory Data Analysis
     st.header("4. Exploratory Data Analysis")
-    
+
     fig1, ax1 = plt.subplots()
     sns.countplot(x='Churn', data=df, ax=ax1)
     st.pyplot(fig1)
@@ -109,17 +109,20 @@ if uploaded_file is not None:
 
     # 7. SHAP Analysis
     st.header("6. Model Explainability (SHAP)")
-    shap.initjs()
-    explainer = shap.TreeExplainer(xgb_model)  # Optimized explainer for tree models
-    shap_values = explainer.shap_values(X_test)
+    try:
+        shap.initjs()
+        explainer = shap.Explainer(xgb_model)
+        shap_values = explainer(X_test)
 
-    st.subheader("Top Features by SHAP Value")
-    shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
-    st.pyplot(bbox_inches='tight')
+        st.subheader("Top Features by SHAP Value")
+        shap.plots.bar(shap_values, show=False)
+        fig_shap = plt.gcf()
+        st.pyplot(fig_shap, bbox_inches='tight')
+    except Exception as e:
+        st.warning(f"SHAP plot skipped due to: {e}")
 
     # 8. Manual Input Prediction
     st.header("7. Manual Churn Prediction")
-
     with st.form("prediction_form"):
         st.subheader("Enter Customer Info:")
 
@@ -130,7 +133,8 @@ if uploaded_file is not None:
         tenure = st.slider("Tenure (months)", 0, 72, 12)
         monthly = st.slider("Monthly Charges", 0.0, 150.0, 70.0)
         total = st.slider("Total Charges", 0.0, 10000.0, 2000.0)
-        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])[0]
+        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72],
+                              labels=['0-12', '12-24', '24-48', '48-72'])[0]
 
         submitted = st.form_submit_button("Predict")
 
@@ -148,7 +152,7 @@ if uploaded_file is not None:
                 'TenureGroup_48-72': 1 if tenure_group == '48-72' else 0
             }
 
-            # Add missing columns (your model might expect more, add as needed)
+            # Ensure all model columns are present
             for col in X.columns:
                 if col not in input_data:
                     input_data[col] = 0
