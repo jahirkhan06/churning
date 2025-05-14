@@ -10,7 +10,6 @@ import xgboost as xgb
 import shap
 
 # Streamlit Config
-st.set_option('deprecation.showPyplotGlobalUse', False)
 st.title("Telco Customer Churn - Full ML Pipeline")
 
 # 1. Upload Dataset
