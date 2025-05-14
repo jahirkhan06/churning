@@ -9,7 +9,9 @@ from sklearn.metrics import classification_report, roc_auc_score, confusion_matr
 import xgboost as xgb
 import shap
 
-# Streamlit Config
+st.set_option('deprecation.showPyplotGlobalUse', False)
+
+# Streamlit App
 st.title("Telco Customer Churn - Full ML Pipeline")
 
 # 1. Upload Dataset
@@ -26,19 +28,22 @@ if uploaded_file is not None:
     df.drop_duplicates(inplace=True)
     df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
     df['TotalCharges'].fillna(df['TotalCharges'].median(), inplace=True)
-    df['Churn'] = df['Churn'].map({'Yes': 1, 'No': 0}).fillna(0)
+    df['Churn'] = df['Churn'].map({'Yes': 1, 'No': 0})
     st.success("Data cleaned!")
 
     # 3. Feature Engineering
     st.header("3. Feature Engineering")
-    df['TenureGroup'] = pd.cut(df['tenure'], bins=[0, 12, 24, 48, 72],
-                               labels=['0-12', '12-24', '24-48', '48-72'])
-    df = pd.get_dummies(df, drop_first=True)
+    df['TenureGroup'] = pd.cut(df['tenure'], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])
+
+    # Encode categorical features
+    cat_cols = df.select_dtypes(include='object').columns.tolist()
+    cat_cols.remove('Churn')
+    df = pd.get_dummies(df, columns=cat_cols + ['TenureGroup'], drop_first=True)
+
     st.write("Processed Data", df.head())
 
     # 4. Exploratory Data Analysis
     st.header("4. Exploratory Data Analysis")
-
     fig1, ax1 = plt.subplots()
     sns.countplot(x='Churn', data=df, ax=ax1)
     st.pyplot(fig1)
@@ -48,16 +53,14 @@ if uploaded_file is not None:
     st.pyplot(fig2)
 
     fig3, ax3 = plt.subplots(figsize=(12, 8))
-    sns.heatmap(df.corr(), annot=False, cmap="coolwarm", ax=ax3)
+    sns.heatmap(df.corr(), cmap="coolwarm", ax=ax3)
     st.pyplot(fig3)
 
-    # 5. Train/Test Split
+    # 5. Model Training & Evaluation
     st.header("5. Model Training & Evaluation")
     X = df.drop('Churn', axis=1)
     y = df['Churn']
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
     # Random Forest
     st.subheader("Random Forest")
@@ -90,7 +93,7 @@ if uploaded_file is not None:
     importance_df = pd.DataFrame({'Feature': X.columns, 'Importance': importances})
     st.dataframe(importance_df.sort_values(by="Importance", ascending=False).head(10))
 
-    # 6. ROC Curve
+    # ROC Curve
     st.subheader("ROC Curve Comparison")
     rf_probs = rf.predict_proba(X_test)[:, 1]
     xgb_probs = xgb_model.predict_proba(X_test)[:, 1]
@@ -107,25 +110,23 @@ if uploaded_file is not None:
     ax_roc.legend()
     st.pyplot(fig_roc)
 
-    # 7. SHAP Analysis
+    # SHAP Explainability
     st.header("6. Model Explainability (SHAP)")
     try:
         shap.initjs()
         explainer = shap.Explainer(xgb_model)
         shap_values = explainer(X_test)
-
         st.subheader("Top Features by SHAP Value")
         shap.plots.bar(shap_values, show=False)
         fig_shap = plt.gcf()
-        st.pyplot(fig_shap, bbox_inches='tight')
+        st.pyplot(fig_shap)
     except Exception as e:
         st.warning(f"SHAP plot skipped due to: {e}")
 
-    # 8. Manual Input Prediction
+    # Manual Prediction
     st.header("7. Manual Churn Prediction")
     with st.form("prediction_form"):
         st.subheader("Enter Customer Info:")
-
         gender = st.selectbox("Gender", ["Male", "Female"])
         senior = st.selectbox("Senior Citizen", [0, 1])
         partner = st.selectbox("Has Partner?", ["Yes", "No"])
@@ -133,8 +134,8 @@ if uploaded_file is not None:
         tenure = st.slider("Tenure (months)", 0, 72, 12)
         monthly = st.slider("Monthly Charges", 0.0, 150.0, 70.0)
         total = st.slider("Total Charges", 0.0, 10000.0, 2000.0)
-        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72],
-                              labels=['0-12', '12-24', '24-48', '48-72'])[0]
+
+        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])[0]
 
         submitted = st.form_submit_button("Predict")
 
@@ -144,20 +145,16 @@ if uploaded_file is not None:
                 'tenure': tenure,
                 'MonthlyCharges': monthly,
                 'TotalCharges': total,
-                'gender_Male': 1 if gender == 'Male' else 0,
-                'Partner_Yes': 1 if partner == 'Yes' else 0,
-                'Dependents_Yes': 1 if dependents == 'Yes' else 0,
-                'TenureGroup_12-24': 1 if tenure_group == '12-24' else 0,
-                'TenureGroup_24-48': 1 if tenure_group == '24-48' else 0,
-                'TenureGroup_48-72': 1 if tenure_group == '48-72' else 0
+                f'gender_{gender}': 1,
+                f'Partner_{partner}': 1,
+                f'Dependents_{dependents}': 1,
+                f'TenureGroup_{tenure_group}': 1
             }
 
-            # Ensure all model columns are present
-            for col in X.columns:
-                if col not in input_data:
-                    input_data[col] = 0
-
+            # Fill other dummies with 0
             input_df = pd.DataFrame([input_data])
+            input_df = input_df.reindex(columns=X.columns, fill_value=0)
+
             prediction = xgb_model.predict(input_df)[0]
             prob = xgb_model.predict_proba(input_df)[0][1]
 
