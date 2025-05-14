@@ -46,4 +46,3 @@ if st.button("Predict Churn"):
     prob = model.predict_proba(input_df)[0][1]
     st.subheader(f"Prediction: {'Will Churn' if prediction[0] == 1 else 'Will Not Churn'}")
     st.write(f"Churn Probability: {prob:.2f}")
-    xgb_model.save_model("xgb_model.json")
