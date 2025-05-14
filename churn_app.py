@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -10,8 +11,6 @@ import xgboost as xgb
 import shap
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
-
-# Streamlit App
 st.title("Telco Customer Churn - Full ML Pipeline")
 
 # 1. Upload Dataset
@@ -27,7 +26,7 @@ if uploaded_file is not None:
     df.drop('customerID', axis=1, inplace=True)
     df.drop_duplicates(inplace=True)
     df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
-    df['TotalCharges'].fillna(df['TotalCharges'].median(), inplace=True)
+    df['TotalCharges'] = df['TotalCharges'].fillna(df['TotalCharges'].median())
     df['Churn'] = df['Churn'].map({'Yes': 1, 'No': 0})
     st.success("Data cleaned!")
 
@@ -35,7 +34,6 @@ if uploaded_file is not None:
     st.header("3. Feature Engineering")
     df['TenureGroup'] = pd.cut(df['tenure'], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])
 
-    # Encode categorical features
     cat_cols = df.select_dtypes(include='object').columns.tolist()
     cat_cols.remove('Churn')
     df = pd.get_dummies(df, columns=cat_cols + ['TenureGroup'], drop_first=True)
@@ -72,7 +70,12 @@ if uploaded_file is not None:
 
     # XGBoost
     st.subheader("XGBoost")
-    xgb_model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+    xgb_model = xgb.XGBClassifier(
+        n_estimators=50,
+        max_depth=4,
+        eval_metric='logloss',
+        verbosity=0
+    )
     xgb_model.fit(X_train, y_train)
     xgb_pred = xgb_model.predict(X_test)
     st.text("Classification Report:\n" + classification_report(y_test, xgb_pred))
@@ -115,7 +118,7 @@ if uploaded_file is not None:
     try:
         shap.initjs()
         explainer = shap.Explainer(xgb_model)
-        shap_values = explainer(X_test)
+        shap_values = explainer(X_test.sample(100, random_state=42))
         st.subheader("Top Features by SHAP Value")
         shap.plots.bar(shap_values, show=False)
         fig_shap = plt.gcf()
@@ -134,8 +137,8 @@ if uploaded_file is not None:
         tenure = st.slider("Tenure (months)", 0, 72, 12)
         monthly = st.slider("Monthly Charges", 0.0, 150.0, 70.0)
         total = st.slider("Total Charges", 0.0, 10000.0, 2000.0)
-
-        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72], labels=['0-12', '12-24', '24-48', '48-72'])[0]
+        tenure_group = pd.cut([tenure], bins=[0, 12, 24, 48, 72],
+                              labels=['0-12', '12-24', '24-48', '48-72'])[0]
 
         submitted = st.form_submit_button("Predict")
 
@@ -151,7 +154,6 @@ if uploaded_file is not None:
                 f'TenureGroup_{tenure_group}': 1
             }
 
-            # Fill other dummies with 0
             input_df = pd.DataFrame([input_data])
             input_df = input_df.reindex(columns=X.columns, fill_value=0)
 
