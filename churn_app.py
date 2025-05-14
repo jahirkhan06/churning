@@ -1,11 +1,4 @@
-streamlit
-pandas
-numpy
-matplotlib
-seaborn
-scikit-learn
-xgboost
-shap
+
 
 import streamlit as st
 import pandas as pd
