@@ -10,7 +10,6 @@ from sklearn.metrics import classification_report, roc_auc_score, confusion_matr
 import xgboost as xgb
 import shap
 
-st.set_option('deprecation.showPyplotGlobalUse', False)
 st.title("Telco Customer Churn - Full ML Pipeline")
 
 # 1. Upload Dataset
