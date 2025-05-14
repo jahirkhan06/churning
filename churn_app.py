@@ -31,18 +31,15 @@ if uploaded_file is not None:
 
     # 3. Feature Engineering
     st.header("3. Feature Engineering")
-    # Create the 'TenureGroup' feature as a categorical variable based on 'tenure'
     df['TenureGroup'] = pd.cut(df['tenure'], bins=[0, 12, 24, 48, 72],
                                labels=['0-12', '12-24', '24-48', '48-72'])
 
-    # One-hot encode the categorical features, including the 'TenureGroup' feature.
     df = pd.get_dummies(df, drop_first=True)
-
     st.write("Processed Data", df.head())
 
     # 4. Exploratory Data Analysis
     st.header("4. Exploratory Data Analysis")
-    
+
     fig1, ax1 = plt.subplots()
     sns.countplot(x='Churn', data=df, ax=ax1)
     st.pyplot(fig1)
@@ -118,5 +115,6 @@ if uploaded_file is not None:
     shap_values = explainer(X_test)
 
     st.subheader("Top Features by SHAP Value")
-    shap.summary_plot(shap_values, X_test)
-    st.pyplot(bbox_inches='tight')  # Ensure proper rendering of the plot
+    fig_shap = plt.figure()
+    shap.summary_plot(shap_values, X_test, show=False)
+    st.pyplot(fig_shap)
