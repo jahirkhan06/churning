@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -35,11 +36,12 @@ if uploaded_file is not None:
     df['TenureGroup'] = pd.cut(df['tenure'], bins=[0, 12, 24, 48, 72],
                                labels=['0-12', '12-24', '24-48', '48-72'])
     df = pd.get_dummies(df, drop_first=True)
+    required_columns = df.columns.tolist()  # For prediction use
     st.write("Processed Data", df.head())
 
     # 4. Exploratory Data Analysis
     st.header("4. Exploratory Data Analysis")
-
+    
     fig1, ax1 = plt.subplots()
     sns.countplot(x='Churn', data=df, ax=ax1)
     st.pyplot(fig1)
@@ -122,12 +124,12 @@ if uploaded_file is not None:
     st.header("7. Manual Churn Prediction")
 
     with st.form("prediction_form"):
-        st.subheader("Enter Customer Info")
+        st.subheader("Enter Customer Info:")
 
         gender = st.selectbox("Gender", ["Male", "Female"])
         senior = st.selectbox("Senior Citizen", [0, 1])
-        partner = st.selectbox("Partner", ["Yes", "No"])
-        dependents = st.selectbox("Dependents", ["Yes", "No"])
+        partner = st.selectbox("Has Partner?", ["Yes", "No"])
+        dependents = st.selectbox("Has Dependents?", ["Yes", "No"])
         tenure = st.slider("Tenure (months)", 0, 72, 12)
         monthly = st.slider("Monthly Charges", 0.0, 150.0, 70.0)
         total = st.slider("Total Charges", 0.0, 10000.0, 2000.0)
@@ -137,25 +139,27 @@ if uploaded_file is not None:
         submitted = st.form_submit_button("Predict")
 
         if submitted:
-            input_data = {
-                'SeniorCitizen': senior,
-                'tenure': tenure,
-                'MonthlyCharges': monthly,
-                'TotalCharges': total,
-                'gender_Male': 1 if gender == 'Male' else 0,
-                'Partner_Yes': 1 if partner == 'Yes' else 0,
-                'Dependents_Yes': 1 if dependents == 'Yes' else 0,
-                'TenureGroup_12-24': 1 if tenure_group == '12-24' else 0,
-                'TenureGroup_24-48': 1 if tenure_group == '24-48' else 0,
-                'TenureGroup_48-72': 1 if tenure_group == '48-72' else 0
-            }
+            input_data = {col: 0 for col in required_columns}
+            input_data['SeniorCitizen'] = senior
+            input_data['tenure'] = tenure
+            input_data['MonthlyCharges'] = monthly
+            input_data['TotalCharges'] = total
 
-            for col in X.columns:
-                if col not in input_data:
-                    input_data[col] = 0
+            # Set categorical dummy values if present
+            if 'gender_Male' in required_columns:
+                input_data['gender_Male'] = 1 if gender == 'Male' else 0
+            if 'Partner_Yes' in required_columns:
+                input_data['Partner_Yes'] = 1 if partner == 'Yes' else 0
+            if 'Dependents_Yes' in required_columns:
+                input_data['Dependents_Yes'] = 1 if dependents == 'Yes' else 0
+            if 'TenureGroup_12-24' in required_columns:
+                input_data['TenureGroup_12-24'] = 1 if tenure_group == '12-24' else 0
+            if 'TenureGroup_24-48' in required_columns:
+                input_data['TenureGroup_24-48'] = 1 if tenure_group == '24-48' else 0
+            if 'TenureGroup_48-72' in required_columns:
+                input_data['TenureGroup_48-72'] = 1 if tenure_group == '48-72' else 0
 
-            input_df = pd.DataFrame([input_data])[X.columns]
-
+            input_df = pd.DataFrame([input_data])
             prediction = xgb_model.predict(input_df)[0]
             prob = xgb_model.predict_proba(input_df)[0][1]
 
